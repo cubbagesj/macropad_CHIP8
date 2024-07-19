@@ -143,27 +143,58 @@ def read_rom(romname = "IBM Logo.ch8", startaddr=0x200):
         while (byte := f.read(1)):
             memory[startaddr] = list(byte)[0]
             startaddr += 1
+    return startaddr -1
+
+# Read in ROM file into memory at 0x200
+end_addr = read_rom("IBM Logo.ch8", 0x200)
+print("end address: %#x" % end_addr)
 
 # Main loop
 #   Fetch/decode/execute
 #
 
-# Read in ROM file
-read_rom("IBM Logo.ch8", 0x200)
-
 # Simply cycle through memory and echo 
-while pc < 4096:
+while pc <= end_addr:
 
 # Fetch instruction at PC
 
-    inst = memory[pc]
+    inst_high = memory[pc]
+    inst_low = memory[pc + 1]
 
-    # echo instruction to screen
-    print("byte = ", hex(pc))
-    print("value = ", hex(inst))
+# Increment the program counter
+    pc = pc + 2
 
-    pc = pc + 1
-    time.sleep(.01)
+# Break out instruction values here to use later
+    inst_type = (inst_high & 0xF0) >> 4        # First nibble
+    inst_X = inst_high & 0x0F                  # Second nibble
+    inst_Y = (inst_low & 0xF0) >> 4            # Third Nibble
+    inst_N = inst_low & 0x0F                   # Fourth Nibble
+    inst_NN = inst_low                         # Third & Fourth Nibbles
+    inst_NNN = (inst_X << 8) + inst_low        # Second, Third Fouth nibbles
 
+    # Decode instruction type - For now echo instruction
+    if inst_type == 0:
+        if inst_Y == 0xE:
+            print("%#x    CLS" % pc)
+        else:
+            pass
+    elif inst_type == 1:
+        print("%#x    JMP    %#x" % (pc-2, inst_NNN))
+    elif inst_type == 2:
+        print("%#x    CALL   %#x" % (pc-2, inst_NNN))
+    elif inst_type == 3:
+        print("%#x    SE    V%d, %d" % (pc-2, inst_X, inst_NN))
+    elif inst_type == 6:
+        print("%#x    LD    V%d, %#x" % (pc-2, inst_X, inst_NNN))
+    elif inst_type == 7:
+        print("%#x    ADD    V%d, %#x" % (pc-2, inst_X, inst_NN))
+    elif inst_type == 0xd:
+        print("%#x    DRW    V%d, V%d, %d" % (pc-2, inst_X, inst_Y, inst_N))
+    elif inst_type == 0xA:
+        print("%#x    LD    I, %#x" % (pc-2, inst_NNN))
+    else:
+       pass 
 
+# Increment the program counter
+    pc = pc + 2
 
