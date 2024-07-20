@@ -213,13 +213,20 @@ while pc <= end_addr:
         print("%#x    SE    V%d, %d" % (pc-2, inst_X, inst_NN))
     elif inst_type == 6:
         print("%#x    LD    V%d, %#x" % (pc-2, inst_X, inst_NN))
-        regs[inst_X] = inst_NNN
+        regs[inst_X] = inst_NN
     elif inst_type == 7:
         print("%#x    ADD    V%d, %#x" % (pc-2, inst_X, inst_NN))
         regs[inst_X] += inst_NN
     elif inst_type == 0xd:
         print("%#x    DRW    V%d, V%d, %d" % (pc-2, inst_X, inst_Y, inst_N))
-        bitmap[inst_X, inst_Y] = 1
+        # Set the x and y coords
+        x_coord = regs[inst_X] % 64
+        y_coord = regs[inst_Y] % 32
+        for i in range(inst_N):
+            value = memory[index_reg + i]
+            for x in range(8):
+                if (value & (0x80 >> x)) != 0:
+                    bitmap[x_coord + x, y_coord + i] = 1
     elif inst_type == 0xA:
         print("%#x    LD    I, %#x" % (pc-2, inst_NNN))
         index_reg = inst_NNN
