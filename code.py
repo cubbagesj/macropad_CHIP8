@@ -157,7 +157,7 @@ sound_timer = 60
 regs = [0] * 16
 index_reg = 0
 
-# Program counter - initialize to 0x200
+# Program counter - initialize to 0x200 since that is where most ROMS load
 pc = 0x200
 
 # Function definitions
@@ -172,7 +172,7 @@ def read_rom(romname = "IBM Logo.ch8", startaddr=0x200):
     return startaddr -1
 
 # Read in ROM file into memory at 0x200
-end_addr = read_rom("IBM Logo.ch8", 0x200)
+end_addr = read_rom("Chip8 Picture.ch8", 0x200)
 print("end address: %#x" % end_addr)
 
 # Main loop
@@ -201,36 +201,87 @@ while pc <= end_addr:
     # Decode instruction type - For now echo instruction
     if inst_type == 0:
         if inst_Y == 0xE:
-            print("%#x    CLS" % (pc-2))
+            if inst_N == 0:         # CLS
+                print("%#x    CLS" % (pc-2))
+                bitmap.fill(0)
+            elif inst_N == 0xE:
+                pc = stack.pop()
+            else:
+                pass
         else:
             pass
-    elif inst_type == 1:
+    elif inst_type == 1:        # JMP
         print("%#x    JMP    %#x" % (pc-2, inst_NNN))
         pc = inst_NNN
-    elif inst_type == 2:
+
+    elif inst_type == 2:        # CALL
         print("%#x    CALL   %#x" % (pc-2, inst_NNN))
+        stack.append(pc)
+        pc = int_NNN
+
     elif inst_type == 3:
         print("%#x    SE    V%d, %d" % (pc-2, inst_X, inst_NN))
+        if (regs[inst_X] == inst_NN):
+            pc = pc + 2
+        else:
+            pass
+
+    elif inst_type == 4:
+        print("%#x    SNE   V%d, %d" % (pc-2, inst_X, inst_NN))
+        if (regs[inst_X] != inst_NN):
+            pc = pc+2
+        else:
+            pass
+
+    elif inst_type == 5:
+        print("%#x    SE    V%d, V%d" % (pc-2, inst_X, inst_Y))
+        if regs[inst_X] == regs[inst_Y]:
+            pc = pc + 2
+        else:
+            pass
+
     elif inst_type == 6:
         print("%#x    LD    V%d, %#x" % (pc-2, inst_X, inst_NN))
         regs[inst_X] = inst_NN
+
     elif inst_type == 7:
         print("%#x    ADD    V%d, %#x" % (pc-2, inst_X, inst_NN))
         regs[inst_X] += inst_NN
+
+    elif inst_type == 8:
+        if inst_N == 0:             # LD Vx, Vy
+            regs[inst_X] = regs[inst_Y]
+        elif inst_N == 1:           # OR Vx, Vy
+            regs[inst_X] |= regs[inst_Y]
+        elif inst_N == 2:           # AND Vx, Vy
+            regs[inst_X] &= regs[inst_Y]
+
     elif inst_type == 0xd:
         print("%#x    DRW    V%d, V%d, %d" % (pc-2, inst_X, inst_Y, inst_N))
         # Set the x and y coords
         x_coord = regs[inst_X] % 64
         y_coord = regs[inst_Y] % 32
+
+        # Clear the collision detection flag
+        regs[0xF] = 0
+
+        # Loop through bytes to display
+        #  - Currently does not do collision detection
+        #  - The macropad display is 128x64 so we need to scale up
+        #    the image and turn each pixel into a block of 4 pixels
         for i in range(inst_N):
             value = memory[index_reg + i]
             for x in range(8):
                 if (value & (0x80 >> x)) != 0:
-                    bitmap[x_coord + x, y_coord + i] = 1
+                    bitmap[(x_coord + x)*2, (y_coord + i)*2] ^= 1
+                    bitmap[(x_coord + x)*2+1, (y_coord + i)*2] ^= 1
+                    bitmap[(x_coord + x)*2, (y_coord + i)*2+1] ^= 1
+                    bitmap[(x_coord + x)*2+1, (y_coord + i)*2+1] ^= 1
+
     elif inst_type == 0xA:
         print("%#x    LD    I, %#x" % (pc-2, inst_NNN))
         index_reg = inst_NNN
+
     else:
        pass 
 
-    time.sleep(0.3)
