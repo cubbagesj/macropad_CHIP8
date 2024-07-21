@@ -172,7 +172,7 @@ def read_rom(romname = "IBM Logo.ch8", startaddr=0x200):
     return startaddr -1
 
 # Read in ROM file into memory at 0x200
-end_addr = read_rom("Chip8 Picture.ch8", 0x200)
+end_addr = read_rom("Zero Demo.ch8", 0x200)
 print("end address: %#x" % end_addr)
 
 # Main loop
@@ -198,7 +198,7 @@ while pc <= end_addr:
     inst_NN = inst_low                         # Third & Fourth Nibbles
     inst_NNN = (inst_X << 8) + inst_low        # Second, Third Fouth nibbles
 
-    # Decode instruction type - For now echo instruction
+    # Decode instruction type 
     if inst_type == 0:
         if inst_Y == 0xE:
             if inst_N == 0:         # CLS
@@ -217,7 +217,7 @@ while pc <= end_addr:
     elif inst_type == 2:        # CALL
         print("%#x    CALL   %#x" % (pc-2, inst_NNN))
         stack.append(pc)
-        pc = int_NNN
+        pc = inst_NNN
 
     elif inst_type == 3:
         print("%#x    SE    V%d, %d" % (pc-2, inst_X, inst_NN))
@@ -255,6 +255,52 @@ while pc <= end_addr:
             regs[inst_X] |= regs[inst_Y]
         elif inst_N == 2:           # AND Vx, Vy
             regs[inst_X] &= regs[inst_Y]
+        elif inst_N == 3:           # XOR Vx, Vy
+            regs[inst_X] ^= regs[inst_Y]
+        elif inst_N == 4:           # ADD Vx, Vy
+            regs[inst_X] += regs[inst_Y]
+            if regs[inst_X] > 255:
+                regs[0xF] = 1
+                regs[inst_X] &= 0xFF
+        elif inst_N == 5:           # SUB Vx, Vy
+            if regs[inst_X] > regs[inst_Y]:
+                regs[0xF] = 1
+            else:
+                regs[0xF] = 0
+            regs[inst_X] -= regs[inst_Y]
+        elif inst_N == 6:           # SHR Vx
+            if (regs[inst_X] & 0x1) == 1:
+                regs[0xF] = 1
+            else:
+                regs[0xF] = 0
+            regs[inst_X] = regs[inst_X] >> 1
+        elif inst_N == 7:           # SUBN Vx, Vy
+            if (regs[inst_Y] > regs[inst_X]):
+                regs[0xF] = 1
+            else:
+                regs[0xF] = 0
+            regs[inst_X] -= regs[inst_Y]
+        elif inst_N == 0xE:        # SHL Vx
+            if (regs[inst_X] & 0x80) == 1:
+                regs[0xF] = 1
+            else:
+                regs[0xF] = 0
+            regs[inst_X] = regs[inst_X] << 1
+            regs[inst_X] &= 0xFF
+        else:
+            pass
+
+    elif inst_type == 0x9:
+        if regs[inst_X] != regs[inst_Y]:
+            pc = pc +2
+        else:
+            pass
+
+    elif inst_type == 0xA:          # LD I, addr
+        index_reg = inst_NNN
+
+    elif inst_type == 0xB:          # JP V0, addr
+        pc = regs[0] + inst_NNN
 
     elif inst_type == 0xd:
         print("%#x    DRW    V%d, V%d, %d" % (pc-2, inst_X, inst_Y, inst_N))
