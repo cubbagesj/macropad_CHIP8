@@ -221,7 +221,7 @@ def dissasemble(memory, start_addr, end_addr):
             print("%#x    DRW    V%d, V%d, %d" % (pc-2, inst_X, inst_Y, inst_N))
 
         elif inst_type == 0xE:
-            if inst_NN = 0x9E:          # SKP Vx
+            if inst_NN == 0x9E:          # SKP Vx
                 print("%#x    SKP    V%d" % (pc-2, inst_X))
             elif inst_NN == 0xA1:       # SKNP Vx
                 print("%#x    SKNP    V%d" % (pc-2, inst_X))
@@ -243,7 +243,7 @@ def dissasemble(memory, start_addr, end_addr):
                 print("%#x    LD    F, V%d" % (pc-2, inst_X))
             elif inst_NN == 0x33:       # LD B, Vx
                 print("%#x    LD    B, V%d" % (pc-2, inst_X))
-            elif inst_NN == 0x55        # LD [I], Vx
+            elif inst_NN == 0x55:        # LD [I], Vx
                 print("%#x    LD    [I], V%d" % (pc-2, inst_X))
             elif inst_NN == 0x65:       # LD Vx, [I]
                 print("%#x    LD     V%d, [I]" % (pc-2, inst_X))

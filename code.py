@@ -81,7 +81,7 @@ memory = chip8_tools.load_font(memory)
 
 # Read ROM file into memory at 0x200
 [memory, end_addr] = chip8_tools.read_rom(memory, 
-                                          romname="Zero Demo.ch8", 
+                                          romname="Trip8 Demo.ch8", 
                                           start_addr = 0x200)
 print("end address: %#x" % end_addr)
 
@@ -231,7 +231,7 @@ while pc <= end_addr:
 
     elif inst_type == 0xC:          # RND Vx, byte
         # Set Vx = random AND nn
-        regs[int_X] = random.randrange(256) & inst_NN
+        regs[inst_X] = random.randrange(256) & inst_NN
 
 
     elif inst_type == 0xD:          # DRW Vx, Vy, nibble
@@ -284,20 +284,20 @@ while pc <= end_addr:
             delay_timer = regs[inst_X]
         elif inst_NN == 0x18:       # LD ST, Vx
             # put value in Vx into sound timer
-            sound_timer = regs[inst_X}
-        elif inst_NN = 0x1E:        # ADD I, Vx
-            index_reg = index_rg + regs[inst_X]
-        elif inst_NN = 0x29:        # LD F, Vx
+            sound_timer = regs[inst_X]
+        elif inst_NN == 0x1E:        # ADD I, Vx
+            index_reg = index_reg + regs[inst_X]
+        elif inst_NN == 0x29:        # LD F, Vx
             # Set I to the location of the sprite for Vx
             index_reg = 0x50 + (5 * regs[inst_X])
-        elif inst_NN = 0x33:        # LD B, Vx
+        elif inst_NN == 0x33:        # LD B, Vx
             # Store BCD representation of Vx in locs I, I+1, I+2
             pass
-        elif inst_NN = 0x55:       # LD [I], Vx
+        elif inst_NN == 0x55:       # LD [I], Vx
             # Store values of V0 to Vx in memory starting at I
             for x in range(inst_X+1):
                 memory[index_reg+x] = regs[x]
-        elif inst_NN = 0x65:       # LD Vx, [I]
+        elif inst_NN == 0x65:       # LD Vx, [I]
             #Read registers V0 to Vx from memory starting at I
             for x in range(inst_X+1):
                 regs[x] = memory[index_reg + x]
@@ -319,4 +319,4 @@ while pc <= end_addr:
         sound_timer -= 1
 
     # Wait to slow down loop
-    time.sleep(1/700)
+    time.sleep(1/1000)
