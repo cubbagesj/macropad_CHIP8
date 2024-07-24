@@ -81,7 +81,7 @@ memory = chip8_tools.load_font(memory)
 
 # Read ROM file into memory at 0x200
 [memory, end_addr] = chip8_tools.read_rom(memory, 
-                                          romname="Trip8 Demo.ch8", 
+                                          romname = "Space Invaders.ch8", 
                                           start_addr = 0x200)
 print("end address: %#x" % end_addr)
 
@@ -103,6 +103,14 @@ while pc <= end_addr:
         print("Key pressed: {}".format(key_event.key_number))
         key_value = key_event.key_number
         key_pressed = True
+    elif key_event and key_event.released:
+        if key_event.key_number == key_value:
+            print("Key released: {}".format(key_event.key_number))
+            key_pressed = True
+            key_value = 0xFF
+        else:
+            pass
+
 
     # execute chip8 loop
 
@@ -250,6 +258,8 @@ while pc <= end_addr:
             value = memory[index_reg + i]
             for x in range(8):
                 if (value & (0x80 >> x)) != 0:
+                    if bitmap[(x_coord + x)*2, (y_coord + i)*2] == 1:
+                        regs[0xF] = 1
                     bitmap[(x_coord + x)*2, (y_coord + i)*2] ^= 1
                     bitmap[(x_coord + x)*2+1, (y_coord + i)*2] ^= 1
                     bitmap[(x_coord + x)*2, (y_coord + i)*2+1] ^= 1
@@ -292,7 +302,9 @@ while pc <= end_addr:
             index_reg = 0x50 + (5 * regs[inst_X])
         elif inst_NN == 0x33:        # LD B, Vx
             # Store BCD representation of Vx in locs I, I+1, I+2
-            pass
+            memory[index_reg + 2] = regs[inst_X] % 10
+            memory[index_reg + 1] = int(regs[inst_X]/10) % 10
+            memory[index_reg] = int(regs[inst_X]/100) % 10
         elif inst_NN == 0x55:       # LD [I], Vx
             # Store values of V0 to Vx in memory starting at I
             for x in range(inst_X+1):
@@ -304,13 +316,6 @@ while pc <= end_addr:
         else:
             pass 
 
-    # Clear out any keypress
-    key_event = macropad.keys.events.get()
-    if key_event and key_event.released:
-        print("Key released: {}".format(key_event.key_number))
-        key_value = 0xFF 
-        key_pressed = False
-
     # Do timer stuff
     #
     if delay_timer > 0:
@@ -319,4 +324,4 @@ while pc <= end_addr:
         sound_timer -= 1
 
     # Wait to slow down loop
-    time.sleep(1/1000)
+    time.sleep(1/700)
