@@ -17,4 +17,4 @@ memory = chip8_tools.load_font(memory)
 
 [memory, endaddr] = chip8_tools.read_rom(memory, romname="Trip8 Demo.ch8")
 
-chip8_tools.dissasemble(memory, 0x200, endaddr)
+chip8_tools.dissasemble(memory, 0x50,0x9F )

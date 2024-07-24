@@ -11,8 +11,11 @@
 # Imports
 #
 import time
+import random
 import board
 import displayio
+import chip8_tools
+from adafruit_macropad import MacroPad
 
 # Initializations
 
@@ -40,115 +43,19 @@ group.append(tile_grid)
 # Add the Group to the Display
 display.root_group = group
 
+macropad = MacroPad()
 
 # Memory - The CHIP8 has 4K (4096) bytes of RAM
 #          Implement this as a list with 4096 elements initialized to zeros
 #
 memory = [0] * 4096
 
-# Font - Use typical font and load starting at memory location 0x50
-memory[0x50] = 0xF0
-memory[0x51] = 0x90
-memory[0x52] = 0x90
-memory[0x53] = 0x90
-memory[0x54] = 0xF0
-
-memory[0x55] = 0x20
-memory[0x56] = 0x60
-memory[0x57] = 0x20
-memory[0x58] = 0x20
-memory[0x59] = 0x70
-
-memory[0x5A] = 0xF0
-memory[0x5B] = 0x10
-memory[0x5C] = 0xF0
-memory[0x5D] = 0x80
-memory[0x5E] = 0xF0
-
-memory[0x5F] = 0xF0
-memory[0x60] = 0x10
-memory[0x61] = 0xF0
-memory[0x62] = 0x10
-memory[0x63] = 0xF0
-
-memory[0x64] = 0x90
-memory[0x65] = 0x90
-memory[0x66] = 0xF0
-memory[0x67] = 0x10
-memory[0x68] = 0x10
-
-memory[0x69] = 0xF0
-memory[0x6A] = 0x80
-memory[0x6B] = 0xF0
-memory[0x6C] = 0x10
-memory[0x6D] = 0xF0
-
-memory[0x6E] = 0xF0
-memory[0x6F] = 0x80
-memory[0x70] = 0xF0
-memory[0x71] = 0x90
-memory[0x72] = 0xF0
-
-memory[0x73] = 0xF0
-memory[0x74] = 0x10
-memory[0x75] = 0x20
-memory[0x76] = 0x40
-memory[0x77] = 0x40
-
-memory[0x78] = 0xF0
-memory[0x79] = 0x90
-memory[0x7A] = 0xF0
-memory[0x7B] = 0x90
-memory[0x7C] = 0xF0
-
-memory[0x7D] = 0xF0
-memory[0x7E] = 0x90
-memory[0x7F] = 0xF0
-memory[0x80] = 0x10
-memory[0x81] = 0xF0
-
-memory[0x82] = 0xF0
-memory[0x83] = 0x90
-memory[0x84] = 0xF0
-memory[0x85] = 0x90
-memory[0x86] = 0x90
-
-memory[0x87] = 0xE0
-memory[0x88] = 0x90
-memory[0x89] = 0xE0
-memory[0x8A] = 0x90
-memory[0x8B] = 0xE0
-
-memory[0x8C] = 0xF0
-memory[0x8D] = 0x80
-memory[0x8E] = 0x80
-memory[0x8F] = 0x80
-memory[0x90] = 0xF0
-
-memory[0x91] = 0xE0
-memory[0x92] = 0x90
-memory[0x93] = 0x90
-memory[0x94] = 0x90
-memory[0x95] = 0xE0
-
-memory[0x96] = 0xF0
-memory[0x97] = 0x80
-memory[0x98] = 0xF0
-memory[0x99] = 0x80
-memory[0x9A] = 0xF0
-
-memory[0x9B] = 0xF0
-memory[0x9C] = 0x80
-memory[0x9D] = 0xF0
-memory[0x9E] = 0x80
-memory[0x9F] = 0x80
-
 # Stack - Make it unlimited for now
 stack = []
 
 # Timers
-delay_timer = 60
-sound_timer = 60
+delay_timer = 0
+sound_timer = 0
 
 # Registers
 #    sixteen 8 bit registers V0-VF
@@ -160,37 +67,54 @@ index_reg = 0
 # Program counter - initialize to 0x200 since that is where most ROMS load
 pc = 0x200
 
-# Function definitions
-#
-def read_rom(romname = "IBM Logo.ch8", startaddr=0x200):
-    # Function to read a rom into memory starting at address 0x200
-    #
-    with open(romname, "rb") as f:
-        while (byte := f.read(1)):
-            memory[startaddr] = list(byte)[0]
-            startaddr += 1
-    return startaddr -1
+# Flags for the keyboard
+key_pressed = False             # Flag for keypress
+key_value = 0xFF                # FF indicates no key press in buffer
 
-# Read in ROM file into memory at 0x200
-end_addr = read_rom("Zero Demo.ch8", 0x200)
+#*********************************************
+# 
+# Initialization complete - Now setup the
+# interpreter
+
+# Load font into memory at 0x50
+memory = chip8_tools.load_font(memory)
+
+# Read ROM file into memory at 0x200
+[memory, end_addr] = chip8_tools.read_rom(memory, 
+                                          romname="Zero Demo.ch8", 
+                                          start_addr = 0x200)
 print("end address: %#x" % end_addr)
 
-# Main loop
-#   Fetch/decode/execute
+
+# Main program loop
+#
+#   The main loop will control the flow of the interpreter and handle the
+#   board stuff and timing as well as running the CHIP 8 interpreter 
 #
 
-# Simply cycle through memory and echo 
+# Continually loop but stop if for some reason the pc goes beyond the end of the
+# loaded ROM. This shouldn't happen but check anyway
 while pc <= end_addr:
 
-# Fetch instruction at PC
+    # Do macropad stuff
+    # Look for keypress
+    key_event = macropad.keys.events.get()
+    if key_event and key_event.pressed:
+        print("Key pressed: {}".format(key_event.key_number))
+        key_value = key_event.key_number
+        key_pressed = True
+
+    # execute chip8 loop
+
+    # Fetch instruction at PC
 
     inst_high = memory[pc]
     inst_low = memory[pc + 1]
 
-# Increment the program counter
+    # Increment the program counter
     pc = pc + 2
 
-# Break out instruction values here to use later
+    # Break out instruction values here to use later
     inst_type = (inst_high & 0xF0) >> 4        # First nibble
     inst_X = inst_high & 0x0F                  # Second nibble
     inst_Y = (inst_low & 0xF0) >> 4            # Third Nibble
@@ -201,86 +125,88 @@ while pc <= end_addr:
     # Decode instruction type 
     if inst_type == 0:
         if inst_Y == 0xE:
-            if inst_N == 0:         # CLS
-                print("%#x    CLS" % (pc-2))
+            if inst_N == 0:                 # CLS
+                # Clear screen
                 bitmap.fill(0)
-            elif inst_N == 0xE:
+            elif inst_N == 0xE:             # RET
+                # Return from subroutine
                 pc = stack.pop()
             else:
                 pass
         else:
             pass
-    elif inst_type == 1:        # JMP
-        print("%#x    JMP    %#x" % (pc-2, inst_NNN))
+
+    elif inst_type == 1:                    # JP nnn
+        # Jump to location nnn
         pc = inst_NNN
 
-    elif inst_type == 2:        # CALL
-        print("%#x    CALL   %#x" % (pc-2, inst_NNN))
+    elif inst_type == 2:                    # CALL nnn
+        # Call subroutine at nnn
         stack.append(pc)
         pc = inst_NNN
 
-    elif inst_type == 3:
-        print("%#x    SE    V%d, %d" % (pc-2, inst_X, inst_NN))
+    elif inst_type == 3:                    # SE Vx, nn
+        # Skip next instruction if Vx == nn
         if (regs[inst_X] == inst_NN):
             pc = pc + 2
         else:
             pass
 
-    elif inst_type == 4:
-        print("%#x    SNE   V%d, %d" % (pc-2, inst_X, inst_NN))
+    elif inst_type == 4:                    # SNE Vx, nn
+        # Skip next instruction if Vx != nn
         if (regs[inst_X] != inst_NN):
             pc = pc+2
         else:
             pass
 
-    elif inst_type == 5:
-        print("%#x    SE    V%d, V%d" % (pc-2, inst_X, inst_Y))
+    elif inst_type == 5:                    # SE Vx, Vy
+        # Skip next instruction if Vx = Vy
         if regs[inst_X] == regs[inst_Y]:
             pc = pc + 2
         else:
             pass
 
-    elif inst_type == 6:
-        print("%#x    LD    V%d, %#x" % (pc-2, inst_X, inst_NN))
+    elif inst_type == 6:                    # LD nn
+        # Set Vx = nn
         regs[inst_X] = inst_NN
 
-    elif inst_type == 7:
-        print("%#x    ADD    V%d, %#x" % (pc-2, inst_X, inst_NN))
+    elif inst_type == 7:                    # ADD Vx, nn
+        # Set Vx = Vx + nn
         regs[inst_X] += inst_NN
 
     elif inst_type == 8:
-        if inst_N == 0:             # LD Vx, Vy
+        if inst_N == 0:                    # LD Vx, Vy
             regs[inst_X] = regs[inst_Y]
-        elif inst_N == 1:           # OR Vx, Vy
+        elif inst_N == 1:                  # OR Vx, Vy
             regs[inst_X] |= regs[inst_Y]
-        elif inst_N == 2:           # AND Vx, Vy
+        elif inst_N == 2:                   # AND Vx, Vy
             regs[inst_X] &= regs[inst_Y]
-        elif inst_N == 3:           # XOR Vx, Vy
+        elif inst_N == 3:                   # XOR Vx, Vy
             regs[inst_X] ^= regs[inst_Y]
-        elif inst_N == 4:           # ADD Vx, Vy
+        elif inst_N == 4:                   # ADD Vx, Vy
             regs[inst_X] += regs[inst_Y]
             if regs[inst_X] > 255:
                 regs[0xF] = 1
                 regs[inst_X] &= 0xFF
-        elif inst_N == 5:           # SUB Vx, Vy
+        elif inst_N == 5:                   # SUB Vx, Vy
             if regs[inst_X] > regs[inst_Y]:
                 regs[0xF] = 1
             else:
                 regs[0xF] = 0
             regs[inst_X] -= regs[inst_Y]
-        elif inst_N == 6:           # SHR Vx
+        elif inst_N == 6:                   # SHR Vx
             if (regs[inst_X] & 0x1) == 1:
                 regs[0xF] = 1
             else:
                 regs[0xF] = 0
             regs[inst_X] = regs[inst_X] >> 1
-        elif inst_N == 7:           # SUBN Vx, Vy
+        elif inst_N == 7:                   # SUBN Vx, Vy
             if (regs[inst_Y] > regs[inst_X]):
                 regs[0xF] = 1
             else:
                 regs[0xF] = 0
             regs[inst_X] -= regs[inst_Y]
-        elif inst_N == 0xE:        # SHL Vx
+        elif inst_N == 0xE:                 # SHL Vx
             if (regs[inst_X] & 0x80) == 1:
                 regs[0xF] = 1
             else:
@@ -290,7 +216,8 @@ while pc <= end_addr:
         else:
             pass
 
-    elif inst_type == 0x9:
+    elif inst_type == 0x9:                  # SNE Vx, Vy
+        # Skip next instruction if Vx != Vy
         if regs[inst_X] != regs[inst_Y]:
             pc = pc +2
         else:
@@ -302,8 +229,12 @@ while pc <= end_addr:
     elif inst_type == 0xB:          # JP V0, addr
         pc = regs[0] + inst_NNN
 
-    elif inst_type == 0xd:
-        print("%#x    DRW    V%d, V%d, %d" % (pc-2, inst_X, inst_Y, inst_N))
+    elif inst_type == 0xC:          # RND Vx, byte
+        # Set Vx = random AND nn
+        regs[int_X] = random.randrange(256) & inst_NN
+
+
+    elif inst_type == 0xD:          # DRW Vx, Vy, nibble
         # Set the x and y coords
         x_coord = regs[inst_X] % 64
         y_coord = regs[inst_Y] % 32
@@ -324,10 +255,68 @@ while pc <= end_addr:
                     bitmap[(x_coord + x)*2, (y_coord + i)*2+1] ^= 1
                     bitmap[(x_coord + x)*2+1, (y_coord + i)*2+1] ^= 1
 
-    elif inst_type == 0xA:
-        print("%#x    LD    I, %#x" % (pc-2, inst_NNN))
-        index_reg = inst_NNN
+    elif inst_type == 0xE:   
+        if inst_NN == 0x9E:         # SKP Vx
+            # Skip next instruction if key with value in Vx is pressed
+            if key_value == regs[inst_X]:
+                pc = pc +2
+            else:
+                pass
+        elif inst_NN == 0xA1:       # SKNP Vx
+            # Skip next instruction if key with value in Vx is not pressed
+            if key_value != regs[inst_X]:
+                pc = pc + 2
+            else:
+                pass
 
-    else:
-       pass 
+    elif inst_type == 0xF:
+        if inst_NN == 0x07:         # LD Vx, DT
+            # Value of delay time put in Vx
+            regs[inst_X] = delay_timer
+        elif inst_NN == 0x0A:       # LD Vx, k
+            # Wait for a keypress and put value in Vx
+            if key_pressed == False:
+                pc = pc - 2
+            else:
+                regs[inst_X] = key_value
+        elif inst_NN == 0x15:       # LD DT, Vx
+            # put value in Vx into delay timer
+            delay_timer = regs[inst_X]
+        elif inst_NN == 0x18:       # LD ST, Vx
+            # put value in Vx into sound timer
+            sound_timer = regs[inst_X}
+        elif inst_NN = 0x1E:        # ADD I, Vx
+            index_reg = index_rg + regs[inst_X]
+        elif inst_NN = 0x29:        # LD F, Vx
+            # Set I to the location of the sprite for Vx
+            index_reg = 0x50 + (5 * regs[inst_X])
+        elif inst_NN = 0x33:        # LD B, Vx
+            # Store BCD representation of Vx in locs I, I+1, I+2
+            pass
+        elif inst_NN = 0x55:       # LD [I], Vx
+            # Store values of V0 to Vx in memory starting at I
+            for x in range(inst_X+1):
+                memory[index_reg+x] = regs[x]
+        elif inst_NN = 0x65:       # LD Vx, [I]
+            #Read registers V0 to Vx from memory starting at I
+            for x in range(inst_X+1):
+                regs[x] = memory[index_reg + x]
+        else:
+            pass 
 
+    # Clear out any keypress
+    key_event = macropad.keys.events.get()
+    if key_event and key_event.released:
+        print("Key released: {}".format(key_event.key_number))
+        key_value = 0xFF 
+        key_pressed = False
+
+    # Do timer stuff
+    #
+    if delay_timer > 0:
+        delay_timer -= 1
+    if sound_timer > 0:
+        sound_timer -= 1
+
+    # Wait to slow down loop
+    time.sleep(1/700)
