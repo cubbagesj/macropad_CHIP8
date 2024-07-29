@@ -71,6 +71,13 @@ pc = 0x200
 key_pressed = False             # Flag for keypress
 key_value = 0xFF                # FF indicates no key press in buffer
 
+# Debug - If debug flag is set, can single step instructions using the 
+# encoder, each click executes one instruction and then prints values 
+# of some of the registers
+
+debug = True
+encoder = 0
+
 #*********************************************
 # 
 # Initialization complete - Now setup the
@@ -81,7 +88,7 @@ memory = chip8_tools.load_font(memory)
 
 # Read ROM file into memory at 0x200
 [memory, end_addr] = chip8_tools.read_rom(memory, 
-                                          romname = "Space Invaders.ch8", 
+                                          romname = "Tetris.ch8", 
                                           start_addr = 0x200)
 print("end address: %#x" % end_addr)
 
@@ -96,6 +103,20 @@ print("end address: %#x" % end_addr)
 # loaded ROM. This shouldn't happen but check anyway
 while pc <= end_addr:
 
+    # Debug  - Single step if true
+    if debug:
+        # Debug flag set so print register values
+        print("Addr: {0:#x} : {1:#x}".format(pc,(memory[pc]<<8) + memory[pc+1]))
+        chip8_tools.dissasemble(memory, pc, pc)
+        print("I: {0:#x}  DT: {1:d}  ST:{2:d}".format(index_reg, delay_timer, sound_timer))
+        for x in range(4):
+            for y in range(4):
+                print("V{0:X}:{1} ".format(y+x*4,regs[y+x*4]),end="") 
+            print("")
+        print("")
+        while encoder == macropad.encoder:
+            time.sleep(0.2)
+        encoder = macropad.encoder
     # Do macropad stuff
     # Look for keypress
     key_event = macropad.keys.events.get()
@@ -181,6 +202,7 @@ while pc <= end_addr:
     elif inst_type == 7:                    # ADD Vx, nn
         # Set Vx = Vx + nn
         regs[inst_X] += inst_NN
+        regs[inst_X] &= 0xFF                # Memory is only 1 byte
 
     elif inst_type == 8:
         if inst_N == 0:                    # LD Vx, Vy

@@ -56,3 +56,15 @@ ROM files.
 
  The chip8_tools.py file has various helper functions including a dissasembler
  that prints out the assembly code from a ROM file
+
+
+ ## References
+ I used the following sites to learn about how CHIP-8 works and how to
+ implement it:
+
+http://devernay.free.fr/hacks/chip8/C8TECH10.HTM#Dxyn
+https://multigesture.net/articles/how-to-write-an-emulator-chip-8-interpreter/
+https://tobiasvl.github.io/blog/write-a-chip-8-emulator/
+
+And ROMS are from:
+https://github.com/loktar00/chip8/tree/master
