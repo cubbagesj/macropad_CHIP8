@@ -21,7 +21,7 @@ from adafruit_macropad import MacroPad
 macropad = MacroPad()
 
 # Read in the list of ROMs and let user select one using the encoder
-with open('roms.lst','r') as file:
+with open('./roms/roms.lst','r') as file:
     roms = [line.strip() for line in file]
 
 text_lines = macropad.display_text(title = "Select ROM")
@@ -37,7 +37,7 @@ while rom_selected != True:
         text_lines.show()
     if macropad.encoder_switch:
         rom_selected = True
-        romfile = roms[macropad.encoder % len(roms)] + '.ch8'
+        romfile = roms[macropad.encoder % len(roms)] 
     time.sleep(.5)
 
 # Setup Display on macropad
@@ -110,7 +110,7 @@ memory = chip8_tools.load_font(memory)
 
 # Read ROM file into memory at 0x200
 [memory, end_addr] = chip8_tools.read_rom(memory, 
-                                          romname = romfile, 
+                                          romname = "./roms/" + romfile, 
                                           start_addr = 0x200)
 print("end address: %#x" % end_addr)
 
