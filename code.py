@@ -18,6 +18,27 @@ import chip8_tools
 from adafruit_macropad import MacroPad
 
 # Initializations
+macropad = MacroPad()
+
+# Read in the list of ROMs and let user select one using the encoder
+with open('roms.lst','r') as file:
+    roms = [line.strip() for line in file]
+
+text_lines = macropad.display_text(title = "Select ROM")
+rom_selected = False
+encoder = 1
+
+while rom_selected != True:
+    text_lines[0].text = ""
+    text_lines[1].text = roms[macropad.encoder % len(roms)]
+    if encoder != macropad.encoder:
+        text_lines[1].text = roms[macropad.encoder % len(roms)]
+        encoder = macropad.encoder
+        text_lines.show()
+    if macropad.encoder_switch:
+        rom_selected = True
+        romfile = roms[macropad.encoder % len(roms)] + '.ch8'
+    time.sleep(.5)
 
 # Setup Display on macropad
 #
@@ -43,7 +64,6 @@ group.append(tile_grid)
 # Add the Group to the Display
 display.root_group = group
 
-macropad = MacroPad()
 
 # Memory - The CHIP8 has 4K (4096) bytes of RAM
 #          Implement this as a list with 4096 elements initialized to zeros
@@ -56,6 +76,7 @@ stack = []
 # Timers
 delay_timer = 0
 sound_timer = 0
+time_now = time.monotonic()
 
 # Registers
 #    sixteen 8 bit registers V0-VF
@@ -75,8 +96,9 @@ key_value = 0xFF                # FF indicates no key press in buffer
 # encoder, each click executes one instruction and then prints values 
 # of some of the registers
 
-debug = True
+debug = False
 encoder = 0
+
 
 #*********************************************
 # 
@@ -88,7 +110,7 @@ memory = chip8_tools.load_font(memory)
 
 # Read ROM file into memory at 0x200
 [memory, end_addr] = chip8_tools.read_rom(memory, 
-                                          romname = "Tetris.ch8", 
+                                          romname = romfile, 
                                           start_addr = 0x200)
 print("end address: %#x" % end_addr)
 
@@ -117,15 +139,22 @@ while pc <= end_addr:
         while encoder == macropad.encoder:
             time.sleep(0.2)
         encoder = macropad.encoder
-    # Do macropad stuff
+
     # Look for keypress
     key_event = macropad.keys.events.get()
     if key_event and key_event.pressed:
         print("Key pressed: {}".format(key_event.key_number))
-        key_value = key_event.key_number
+        key_value_raw = key_event.key_number
         key_pressed = True
+        # Keyboard remapping
+        if key_value_raw <= 9:
+            key_value = key_value_raw + 1
+        elif key_value_raw == 10:
+            key_value = 0
+        elif key_value_raw == 11:
+            key_value = 11
     elif key_event and key_event.released:
-        if key_event.key_number == key_value:
+        if key_event.key_number == key_value_raw:
             print("Key released: {}".format(key_event.key_number))
             key_pressed = True
             key_value = 0xFF
@@ -218,6 +247,8 @@ while pc <= end_addr:
             if regs[inst_X] > 255:
                 regs[0xF] = 1
                 regs[inst_X] &= 0xFF
+            else:
+                regs[0xF] = 0
         elif inst_N == 5:                   # SUB Vx, Vy
             if regs[inst_X] > regs[inst_Y]:
                 regs[0xF] = 1
@@ -273,19 +304,23 @@ while pc <= end_addr:
         regs[0xF] = 0
 
         # Loop through bytes to display
-        #  - Currently does not do collision detection
         #  - The macropad display is 128x64 so we need to scale up
         #    the image and turn each pixel into a block of 4 pixels
-        for i in range(inst_N):
-            value = memory[index_reg + i]
+        for y in range(inst_N):
+            pixel = memory[index_reg + y]
             for x in range(8):
-                if (value & (0x80 >> x)) != 0:
-                    if bitmap[(x_coord + x)*2, (y_coord + i)*2] == 1:
+                if (pixel & (0x80 >> x)) != 0:
+                    if bitmap[((x_coord + x)*2)%display.width,
+                              ((y_coord + y)*2)%display.height] == 1:
                         regs[0xF] = 1
-                    bitmap[(x_coord + x)*2, (y_coord + i)*2] ^= 1
-                    bitmap[(x_coord + x)*2+1, (y_coord + i)*2] ^= 1
-                    bitmap[(x_coord + x)*2, (y_coord + i)*2+1] ^= 1
-                    bitmap[(x_coord + x)*2+1, (y_coord + i)*2+1] ^= 1
+                    bitmap[((x_coord + x)*2)%display.width,
+                           ((y_coord + y)*2)%display.height] ^= 1
+                    bitmap[((x_coord + x)*2+1)%display.width,
+                           ((y_coord + y)*2)%display.height] ^= 1
+                    bitmap[((x_coord + x)*2)%display.width,
+                           ((y_coord + y)*2+1)%display.height] ^= 1
+                    bitmap[((x_coord + x)*2+1)%display.width,
+                           ((y_coord + y)*2+1)%display.height] ^= 1
 
     elif inst_type == 0xE:   
         if inst_NN == 0x9E:         # SKP Vx
@@ -339,11 +374,15 @@ while pc <= end_addr:
             pass 
 
     # Do timer stuff
+    # Timers get decremented if greater than zero every 1/60 s
     #
-    if delay_timer > 0:
-        delay_timer -= 1
-    if sound_timer > 0:
-        sound_timer -= 1
+    if time.monotonic() - time_now >= 0.01667:
+        if delay_timer > 0:
+            delay_timer -= 1
+        if sound_timer > 0:
+            sound_timer -= 1
+     #       macropad.play_tone(292,0.01)
+        time_now = time.monotonic()
 
     # Wait to slow down loop
     time.sleep(1/700)
