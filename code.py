@@ -1,4 +1,4 @@
-# chip8.py
+#chip8.py
 #
 #  This is an attempt to create a CHIP8 interpreter in circuitpython
 #  for the RP2040 on the Adafruit Macropad
@@ -38,7 +38,7 @@ while rom_selected != True:
     if macropad.encoder_switch:
         rom_selected = True
         romfile = roms[macropad.encoder % len(roms)] 
-    time.sleep(.5)
+    time.sleep(.2)
 
 # Setup Display on macropad
 #
@@ -146,6 +146,7 @@ while pc <= end_addr:
         print("Key pressed: {}".format(key_event.key_number))
         key_value_raw = key_event.key_number
         key_pressed = True
+        key_read = False
         # Keyboard remapping
         if key_value_raw <= 9:
             key_value = key_value_raw + 1
@@ -153,10 +154,10 @@ while pc <= end_addr:
             key_value = 0
         elif key_value_raw == 11:
             key_value = 11
-    elif key_event and key_event.released:
+    elif key_event and key_event.released and key_read:
         if key_event.key_number == key_value_raw:
             print("Key released: {}".format(key_event.key_number))
-            key_pressed = True
+            key_pressed = False
             key_value = 0xFF
         else:
             pass
@@ -310,27 +311,30 @@ while pc <= end_addr:
             pixel = memory[index_reg + y]
             for x in range(8):
                 if (pixel & (0x80 >> x)) != 0:
-                    if bitmap[((x_coord + x)*2)%display.width,
-                              ((y_coord + y)*2)%display.height] == 1:
-                        regs[0xF] = 1
-                    bitmap[((x_coord + x)*2)%display.width,
-                           ((y_coord + y)*2)%display.height] ^= 1
-                    bitmap[((x_coord + x)*2+1)%display.width,
-                           ((y_coord + y)*2)%display.height] ^= 1
-                    bitmap[((x_coord + x)*2)%display.width,
-                           ((y_coord + y)*2+1)%display.height] ^= 1
-                    bitmap[((x_coord + x)*2+1)%display.width,
-                           ((y_coord + y)*2+1)%display.height] ^= 1
+                    if (x_coord + x <= 64) and (y_coord + y <=32):
+                        if bitmap[((x_coord + x)*2)%display.width,
+                                  ((y_coord + y)*2)%display.height] == 1:
+                            regs[0xF] = 1
+                        bitmap[((x_coord + x)*2)%display.width,
+                               ((y_coord + y)*2)%display.height] ^= 1
+                        bitmap[((x_coord + x)*2+1)%display.width,
+                               ((y_coord + y)*2)%display.height] ^= 1
+                        bitmap[((x_coord + x)*2)%display.width,
+                               ((y_coord + y)*2+1)%display.height] ^= 1
+                        bitmap[((x_coord + x)*2+1)%display.width,
+                               ((y_coord + y)*2+1)%display.height] ^= 1
 
     elif inst_type == 0xE:   
         if inst_NN == 0x9E:         # SKP Vx
             # Skip next instruction if key with value in Vx is pressed
+            key_read = True
             if key_value == regs[inst_X]:
                 pc = pc +2
             else:
                 pass
         elif inst_NN == 0xA1:       # SKNP Vx
             # Skip next instruction if key with value in Vx is not pressed
+            key_read = True
             if key_value != regs[inst_X]:
                 pc = pc + 2
             else:
@@ -345,6 +349,7 @@ while pc <= end_addr:
             if key_pressed == False:
                 pc = pc - 2
             else:
+                key_read = True
                 regs[inst_X] = key_value
         elif inst_NN == 0x15:       # LD DT, Vx
             # put value in Vx into delay timer
@@ -376,13 +381,15 @@ while pc <= end_addr:
     # Do timer stuff
     # Timers get decremented if greater than zero every 1/60 s
     #
-    if time.monotonic() - time_now >= 0.01667:
+    if time.monotonic() - time_now >= 1/60:
         if delay_timer > 0:
             delay_timer -= 1
         if sound_timer > 0:
             sound_timer -= 1
-     #       macropad.play_tone(292,0.01)
+            macropad.start_tone(292)
+        else: 
+            macropad.stop_tone()
         time_now = time.monotonic()
 
     # Wait to slow down loop
-    time.sleep(1/700)
+    time.sleep(1/900)

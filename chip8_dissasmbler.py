@@ -15,6 +15,6 @@ memory = [0] * 4096
 
 memory = chip8_tools.load_font(memory)
 
-[memory, endaddr] = chip8_tools.read_rom(memory, romname="Tetris.ch8")
+[memory, endaddr] = chip8_tools.read_rom(memory, romname="./roms/Tetris.ch8")
 
 chip8_tools.dissasemble(memory, 0x200,endaddr )
